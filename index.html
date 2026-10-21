@@ -364,7 +364,16 @@
           <button type="button" id="backupBtn">⇩ Unduh cadangan (JSON)</button>
         </section>
 
-        <p class="footer">Sorentho Garage Kasir v<span id="appVersion">2.2.1</span></p>
+        <section class="panel stack danger-zone" style="margin-top:14px">
+          <div>
+            <h2>Reset transaksi &amp; riwayat stok</h2>
+            <p class="muted small-text">Menghapus semua riwayat transaksi dan pergerakan stok secara permanen dari semua perangkat. Stok produk tidak berubah. Nomor transaksi akan dimulai lagi dari SG-000001.</p>
+            <p class="note">Unduh cadangan sebelum reset jika ingin menyimpan salinan data lama.</p>
+          </div>
+          <button type="button" class="danger" id="resetSalesBtn">Reset transaksi &amp; riwayat</button>
+        </section>
+
+        <p class="footer">Sorentho Garage Kasir v<span id="appVersion">2.2.2</span></p>
       </section>
 
     </main>
@@ -546,6 +555,20 @@
         <div class="modalactions">
           <button type="button" id="confirmCancel">Batal</button>
           <button type="button" class="primary" id="confirmOk">Ya</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modalback" id="resetSalesModal" role="alertdialog" aria-modal="true" aria-labelledby="resetSalesTitle">
+      <div class="modal">
+        <h3 id="resetSalesTitle">Konfirmasi reset data transaksi</h3>
+        <p>Semua riwayat transaksi dan pergerakan stok akan dihapus permanen di cloud. Stok produk tetap seperti sekarang, dan nomor transaksi dimulai lagi dari SG-000001.</p>
+        <p class="danger-text">Tindakan ini berlaku untuk semua perangkat dan tidak bisa dibatalkan. Sebaiknya unduh cadangan terlebih dahulu.</p>
+        <label for="resetSalesConfirmation">Ketik HAPUS untuk melanjutkan</label>
+        <input id="resetSalesConfirmation" autocomplete="off" spellcheck="false">
+        <div class="modalactions">
+          <button type="button" id="resetSalesCancel">Batal</button>
+          <button type="button" class="danger" id="resetSalesConfirm">Hapus permanen</button>
         </div>
       </div>
     </div>

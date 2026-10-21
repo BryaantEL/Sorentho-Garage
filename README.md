@@ -1,4 +1,4 @@
-# Sorentho Garage Kasir — v2.2.1
+# Sorentho Garage Kasir — v2.2.2
 
 Aplikasi kasir berbasis web (PWA). Data toko disimpan di Supabase dan dibagikan antar perangkat yang masuk ke akun pemilik yang sama. IndexedDB di browser hanya menjadi cache; transaksi dan perubahan data memerlukan koneksi internet.
 
@@ -49,7 +49,9 @@ Buka aplikasi di Chrome Android, tekan **⋮**, lalu pilih **Instal aplikasi** a
 | **Produk** | Jenis produk (buat, ubah, hapus), tambah dan ubah produk, tambah stok, riwayat stok, nonaktifkan produk |
 | **Laporan** | Omzet hari, minggu, dan bulan; grafik 7 hari, 8 minggu, atau 12 bulan; produk terlaris; metode bayar; target dan saran |
 | **Riwayat** | Daftar transaksi, struk, simpan struk sebagai gambar, bagikan, cetak, batalkan transaksi, export CSV |
-| **Pengaturan** | Akun, QRIS toko, logo toko, nama dan alamat toko, lebar kertas struk, cadangan JSON |
+| **Pengaturan** | Akun, QRIS toko, logo toko, nama dan alamat toko, lebar kertas struk, cadangan JSON, reset riwayat transaksi dan pergerakan stok |
+
+Reset riwayat di **Pengaturan** menghapus transaksi beserta riwayat pergerakan stok dari cloud, mengatur ulang nomor transaksi, dan tidak mengubah stok produk. Unduh cadangan terlebih dahulu jika masih memerlukan salinan data lama.
 
 ### QRIS
 1. Di **Pengaturan → QRIS toko**, unggah gambar QRIS Anda sekali saja.

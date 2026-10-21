@@ -361,6 +361,27 @@ const check = async (name, fn) => {
     assert.ok(body.includes('Status') && body.includes('Dibatalkan'));
   });
 
+  await check('reset menolak konfirmasi salah dan menghapus riwayat tanpa mengubah stok', async () => {
+    const before = await page.evaluate(() => JSON.parse(localStorage.getItem('e2e-shop-state')).payload.products
+      .find((product) => product.id === 'p1').stock);
+    await tab('pengaturan');
+    await page.click('#resetSalesBtn');
+    await page.waitForSelector('#resetSalesModal.open');
+    await page.fill('#resetSalesConfirmation', 'salah');
+    await page.click('#resetSalesConfirm');
+    assert.ok(await page.locator('#resetSalesModal').evaluate((element) => element.classList.contains('open')));
+
+    await page.fill('#resetSalesConfirmation', 'HAPUS');
+    await page.click('#resetSalesConfirm');
+    await page.waitForSelector('#resetSalesModal', { state: 'hidden' });
+    const snapshot = await page.evaluate(() => JSON.parse(localStorage.getItem('e2e-shop-state')).payload);
+    assert.strictEqual(snapshot.transactions.length, 0);
+    assert.strictEqual(snapshot.movements.length, 0);
+    assert.strictEqual(snapshot.settings.lastNo, 0);
+    assert.strictEqual(snapshot.products.find((product) => product.id === 'p1').stock, before);
+    assert.ok((await page.textContent('#statAll')) === '0');
+  });
+
   await check('pengaturan: logout kembali ke halaman login', async () => {
     await tab('pengaturan');
     await page.click('#logoutBtn');

@@ -1,11 +1,11 @@
 /* ==========================================================================
-   Sorentho Garage Kasir — v2.2.1
+   Sorentho Garage Kasir — v2.2.2
    Vanilla JS PWA. Data utama di Supabase, cache perangkat di IndexedDB.
    ========================================================================== */
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.2.1';
+  const APP_VERSION = '2.2.2';
   const DB_NAME = 'sorentho-kasir';
   const DB_VERSION = 2;
   const CART_KEY = 'sg_cart_v1';
@@ -1771,6 +1771,41 @@
     toast('Pengaturan disimpan');
   }
 
+  function openResetSalesHistory() {
+    if (busy) return;
+    if (!state.transactions.length && !state.movements.length && state.settings.lastNo === 0) {
+      return toast('Riwayat transaksi dan stok sudah kosong');
+    }
+    $('resetSalesConfirmation').value = '';
+    openModal('resetSalesModal');
+  }
+
+  async function confirmResetSalesHistory() {
+    if (busy) return;
+    if ($('resetSalesConfirmation').value.trim() !== 'HAPUS') {
+      return toast('Ketik HAPUS dengan benar untuk melanjutkan');
+    }
+
+    const nextSettings = { ...state.settings, lastNo: 0 };
+    const saved = await safeWrite(
+      ['transactions', 'movements', 'settings'],
+      (idb) => {
+        idb.objectStore('transactions').clear();
+        idb.objectStore('movements').clear();
+        idb.objectStore('settings').put({ key: 'main', value: nextSettings });
+      },
+      'Riwayat transaksi direset. Stok produk tidak berubah.',
+    );
+    if (!saved) return;
+
+    state.transactions = [];
+    state.movements = [];
+    state.settings = nextSettings;
+    closeModal('resetSalesModal');
+    renderAll();
+    if (ui.tab === 'pengaturan') fillSettingsForm();
+  }
+
   function fillSettingsForm() {
     $('storeName').value = state.settings.name;
     $('storeInfo').value = state.settings.info || '';
@@ -1884,7 +1919,7 @@
     $(id).classList.remove('open');
   }
 
-  const MODAL_IDS = ['productModal', 'restockModal', 'categoryModal', 'movementsModal', 'receiptModal', 'voidModal', 'qrisModal'];
+  const MODAL_IDS = ['productModal', 'restockModal', 'categoryModal', 'movementsModal', 'receiptModal', 'voidModal', 'qrisModal', 'resetSalesModal'];
   function closeAllModals() {
     MODAL_IDS.forEach(closeModal);
     settleConfirm(false);
@@ -2081,6 +2116,9 @@
     // Pengaturan
     on('saveSettingsBtn', 'click', saveSettings);
     on('backupBtn', 'click', exportBackup);
+    on('resetSalesBtn', 'click', openResetSalesHistory);
+    on('resetSalesCancel', 'click', () => closeModal('resetSalesModal'));
+    on('resetSalesConfirm', 'click', confirmResetSalesHistory);
     on('installBtn', 'click', async () => {
       if (!deferredInstall) return;
       deferredInstall.prompt();

@@ -1,0 +1,15 @@
+{
+  "name": "Sorentho Garage Kasir",
+  "short_name": "Kasir SG",
+  "description": "Aplikasi kasir Sorentho Garage",
+  "lang": "id",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0d10",
+  "theme_color": "#0b0d10",
+  "icons": [
+    { "src": "assets/logo.png", "type": "image/png" }
+  ]
+}

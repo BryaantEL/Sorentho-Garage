@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d10">
+  <meta name="description" content="Aplikasi kasir Sorentho Garage">
+  <title>Sorentho Garage — Kasir</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="apple-touch-icon" href="assets/logo.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ============ LOGIN ============ -->
+  <section id="loginView" class="login" hidden>
+    <div class="login-card">
+      <div class="login-tools">
+        <button type="button" class="theme-toggle" id="themeToggleLogin" aria-label="Aktifkan mode terang">
+          <span class="theme-icon" aria-hidden="true">☀</span><span class="theme-label">Terang</span>
+        </button>
+      </div>
+      <img class="login-logo" id="loginLogo" src="assets/logo.png" alt="Sorentho Garage">
+      <h1>Masuk ke kasir</h1>
+      <p class="muted small-text">Gunakan akun yang diberikan untuk mengakses kasir.</p>
+
+      <form id="loginForm" autocomplete="on" novalidate>
+        <div class="field">
+          <label for="loginUser">Email pemilik</label>
+          <input id="loginUser" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="loginPass">Password</label>
+          <div class="pwrap">
+            <input id="loginPass" name="password" type="password" autocomplete="current-password">
+            <button type="button" class="ghost small" id="togglePass" aria-label="Tampilkan atau sembunyikan password">Lihat</button>
+          </div>
+        </div>
+        <p class="warn" id="loginError" role="alert"></p>
+        <button type="submit" class="primary big" id="loginBtn">Masuk</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============ APLIKASI ============ -->
+  <div id="appShell" hidden>
+
+    <header class="topbar">
+      <img class="logo" id="topLogo" src="assets/logo.png" alt="Sorentho Garage">
+      <div class="topbar-tools">
+        <div class="topmeta" id="clock"></div>
+        <button type="button" class="theme-toggle" id="themeToggleApp" aria-label="Aktifkan mode terang">
+          <span class="theme-icon" aria-hidden="true">☀</span><span class="theme-label">Terang</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="app">
+
+      <!-- KASIR -->
+      <section class="view active" id="view-kasir">
+        <div class="stats">
+          <div class="stat">
+            <div class="cap">Penjualan hari ini</div>
+            <div class="num" id="statSales">Rp0</div>
+            <div class="hint" id="statCount">0 transaksi</div>
+          </div>
+          <div class="stat">
+            <div class="cap">Total transaksi</div>
+            <div class="num" id="statAll">0</div>
+            <div class="hint">Tersimpan di perangkat ini</div>
+          </div>
+          <div class="stat">
+            <div class="cap">Produk aktif</div>
+            <div class="num" id="statProducts">0</div>
+            <div class="hint">Barang &amp; jasa</div>
+          </div>
+          <div class="stat">
+            <div class="cap">Stok menipis</div>
+            <div class="num" id="statLow">0</div>
+            <div class="hint">Di bawah ambang</div>
+          </div>
+        </div>
+
+        <div class="kasir-grid">
+          <section class="panel">
+            <div class="phead">
+              <div>
+                <h2>Pilih produk</h2>
+                <p class="muted small-text">Ketuk produk untuk menambahkannya ke keranjang.</p>
+              </div>
+            </div>
+            <input type="search" id="search" placeholder="Cari nama atau SKU…" aria-label="Cari produk" autocomplete="off">
+            <div class="chips" id="chips" role="group" aria-label="Filter jenis produk"></div>
+            <div class="grid" id="productGrid"></div>
+          </section>
+
+          <aside class="cart" id="cart" aria-label="Keranjang belanja">
+            <div class="cart-handle" aria-hidden="true"></div>
+
+            <div class="carthead">
+              <h2>Keranjang <span class="badge" id="cartCount">0 item</span></h2>
+              <div class="cart-actions">
+                <button type="button" class="ghost small" id="clearCartBtn">Kosongkan</button>
+                <button type="button" class="ghost small m-only" id="closeSheet">Tutup</button>
+              </div>
+            </div>
+
+            <div class="cartlist" id="cartList"></div>
+
+            <div class="summary">
+              <div class="row"><span>Subtotal</span><strong id="subtotal">Rp0</strong></div>
+
+              <div class="two">
+                <div>
+                  <label for="discount">Diskon</label>
+                  <input type="number" inputmode="numeric" min="0" id="discount" value="0">
+                </div>
+                <div>
+                  <label for="discountType">Jenis diskon</label>
+                  <select id="discountType">
+                    <option value="percent">Persen (%)</option>
+                    <option value="nominal">Nominal (Rp)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="row"><span>Potongan</span><strong id="discountOut">− Rp0</strong></div>
+              <div class="row total-row"><span>Total akhir</span><strong class="total" id="total">Rp0</strong></div>
+
+              <div class="seg" id="methods" role="group" aria-label="Metode pembayaran">
+                <button type="button" data-method="tunai" class="active">Tunai</button>
+                <button type="button" data-method="qris">QRIS</button>
+                <button type="button" data-method="transfer">Transfer</button>
+              </div>
+
+              <div id="cashBox" class="field">
+                <label for="paid">Uang dibayar (Rp)</label>
+                <input type="number" inputmode="numeric" min="0" id="paid" placeholder="Masukkan nominal">
+                <div class="quick" id="quick"></div>
+              </div>
+
+              <div id="refBox" class="field" hidden>
+                <button type="button" class="ghost big" id="showQris" hidden>📱 Tampilkan QRIS ke pelanggan</button>
+                <p class="note" id="qrisHint" hidden>Belum ada QRIS. Unggah gambar QRIS di menu Pengaturan.</p>
+                <label for="ref" class="mt"><span id="refLabel">Nomor referensi</span></label>
+                <input id="ref" placeholder="Nomor bukti / referensi" autocomplete="off">
+                <p class="note">Pembayaran non-tunai dikonfirmasi manual. Pastikan dana sudah masuk sebelum menyimpan.</p>
+              </div>
+
+              <div class="field">
+                <label for="customer">Nama pelanggan (opsional)</label>
+                <input id="customer" placeholder="Pelanggan umum" autocomplete="off">
+              </div>
+
+              <div class="change">
+                <span>Kembalian</span>
+                <strong id="changeOut">Rp0</strong>
+              </div>
+
+              <p class="warn" id="warn" role="alert"></p>
+
+              <button type="button" class="primary big" id="checkoutBtn" disabled>✓ Selesaikan transaksi</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- PRODUK -->
+      <section class="view" id="view-produk">
+        <section class="panel stack">
+          <div class="phead">
+            <div>
+              <h2>Jenis produk</h2>
+              <p class="muted small-text">Buat, ubah, atau hapus jenis produk sesuai kebutuhan toko.</p>
+            </div>
+            <button type="button" class="primary small" id="addCatBtn">＋ Jenis baru</button>
+          </div>
+          <div class="list" id="catList"></div>
+        </section>
+
+        <section class="panel" style="margin-top:14px">
+          <div class="phead">
+            <div>
+              <h2>Produk &amp; stok</h2>
+              <p class="muted small-text">Ubah data produk, tambah stok, lihat riwayat stok, atau nonaktifkan produk.</p>
+            </div>
+            <div class="tools">
+              <input type="search" id="manageSearch" placeholder="Cari produk…" aria-label="Cari produk" autocomplete="off">
+              <button type="button" class="primary" id="addProductBtn">＋ Tambah produk</button>
+            </div>
+          </div>
+          <div class="list" id="manageList"></div>
+        </section>
+      </section>
+
+      <!-- LAPORAN -->
+      <section class="view" id="view-laporan">
+        <div class="cards3">
+          <div class="stat">
+            <div class="cap">Hari ini</div>
+            <div class="num" id="repDay">Rp0</div>
+            <div class="hint" id="repDayN">0 transaksi</div>
+          </div>
+          <div class="stat">
+            <div class="cap">Minggu ini</div>
+            <div class="num" id="repWeek">Rp0</div>
+            <div class="hint" id="repWeekN">0 transaksi</div>
+          </div>
+          <div class="stat">
+            <div class="cap">Bulan ini</div>
+            <div class="num" id="repMonth">Rp0</div>
+            <div class="hint" id="repMonthN">0 transaksi</div>
+          </div>
+        </div>
+
+        <section class="panel stack">
+          <div>
+            <h2>Target &amp; saran penghasilan</h2>
+            <p class="muted small-text">Target bersifat opsional. Saran dihitung dari rata-rata penjualan minggu dan bulan yang sudah selesai, ditambah 10%.</p>
+          </div>
+          <div class="two">
+            <div>
+              <label for="targetWeek">Target per minggu (Rp)</label>
+              <input type="number" inputmode="numeric" min="0" id="targetWeek" placeholder="0 = tidak ada">
+            </div>
+            <div>
+              <label for="targetMonth">Target per bulan (Rp)</label>
+              <input type="number" inputmode="numeric" min="0" id="targetMonth" placeholder="0 = tidak ada">
+            </div>
+          </div>
+          <div class="suggest" id="suggestBox"></div>
+          <div class="progress-block">
+            <div class="row"><span>Minggu ini</span><strong id="progWeekTxt">—</strong></div>
+            <div class="bar"><span id="progWeek"></span></div>
+          </div>
+          <div class="progress-block">
+            <div class="row"><span>Bulan ini</span><strong id="progMonthTxt">—</strong></div>
+            <div class="bar"><span id="progMonth"></span></div>
+          </div>
+          <div class="modalactions">
+            <button type="button" id="useSuggest">Pakai saran</button>
+            <button type="button" class="primary" id="saveTargets">Simpan target</button>
+          </div>
+        </section>
+
+        <section class="panel stack">
+          <div class="phead">
+            <div>
+              <h2>Grafik penjualan</h2>
+              <p class="muted small-text">Transaksi yang dibatalkan tidak dihitung.</p>
+            </div>
+            <div class="seg seg-compact" id="rangeSeg" role="group" aria-label="Rentang grafik">
+              <button type="button" data-range="day" class="active">7 hari</button>
+              <button type="button" data-range="week">8 minggu</button>
+              <button type="button" data-range="month">12 bulan</button>
+            </div>
+          </div>
+          <div class="chart-scroll"><div class="chart" id="chart"></div></div>
+        </section>
+
+        <section class="panel stack">
+          <h2>Produk terlaris <span class="muted small-text" id="rangeLabel1"></span></h2>
+          <div class="list" id="topList"></div>
+        </section>
+
+        <section class="panel stack">
+          <h2>Metode pembayaran <span class="muted small-text" id="rangeLabel2"></span></h2>
+          <div class="list" id="methodList"></div>
+        </section>
+      </section>
+
+      <!-- RIWAYAT -->
+      <section class="view" id="view-riwayat">
+        <section class="panel">
+          <div class="phead">
+            <div>
+              <h2>Riwayat transaksi</h2>
+              <p class="muted small-text">Ketuk transaksi untuk melihat struk, menyimpannya sebagai gambar, atau membatalkannya bila salah.</p>
+            </div>
+            <div class="tools">
+              <input type="search" id="historySearch" placeholder="Cari nomor / pelanggan…" aria-label="Cari riwayat" autocomplete="off">
+              <button type="button" id="exportCsvBtn">⇩ Export CSV</button>
+            </div>
+          </div>
+          <div class="list" id="historyList"></div>
+        </section>
+      </section>
+
+      <!-- PENGATURAN -->
+      <section class="view" id="view-pengaturan">
+        <section class="panel stack">
+          <div>
+            <h2>Akun</h2>
+            <p class="muted small-text" id="accountInfo"></p>
+          </div>
+          <button type="button" class="danger" id="logoutBtn">Keluar</button>
+        </section>
+
+        <section class="panel stack" style="margin-top:14px">
+          <div>
+            <h2>QRIS toko</h2>
+            <p class="muted small-text">Unggah gambar QRIS Anda sekali saja. Saat pelanggan membayar, tekan "Tampilkan QRIS" agar pelanggan memindainya dari layar HP Anda.</p>
+          </div>
+          <div class="qris-preview" id="qrisPreview"><span class="muted">Belum ada gambar QRIS</span></div>
+          <div class="tools">
+            <label class="filebtn" for="qrisFile">Pilih gambar QRIS</label>
+            <input type="file" id="qrisFile" accept="image/*" hidden>
+            <button type="button" class="ghost" id="qrisRemove">Hapus QRIS</button>
+          </div>
+        </section>
+
+        <section class="panel stack" style="margin-top:14px">
+          <div>
+            <h2>Logo toko</h2>
+            <p class="muted small-text">Logo bawaan sudah terpasang. Unggah logo lain di sini jika ingin menggantinya pada header dan layar masuk.</p>
+          </div>
+          <div class="qris-preview logo-preview" id="logoPreview"></div>
+          <div class="tools">
+            <label class="filebtn" for="logoFile">Unggah logo</label>
+            <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp" hidden>
+            <button type="button" class="ghost" id="logoRemove">Kembali ke logo bawaan</button>
+          </div>
+        </section>
+
+        <section class="panel stack" style="margin-top:14px">
+          <div>
+            <h2>Pengaturan toko</h2>
+            <p class="muted small-text">Ditampilkan pada struk.</p>
+          </div>
+          <div>
+            <label for="storeName">Nama toko</label>
+            <input id="storeName" autocomplete="off">
+          </div>
+          <div>
+            <label for="storeInfo">Alamat / kontak (opsional)</label>
+            <input id="storeInfo" placeholder="Alamat bengkel atau nomor telepon" autocomplete="off">
+          </div>
+          <div>
+            <label for="paperSize">Lebar kertas struk</label>
+            <select id="paperSize">
+              <option value="58">Printer 58 mm</option>
+              <option value="80">Printer 80 mm</option>
+            </select>
+          </div>
+          <div class="modalactions">
+            <button type="button" class="primary" id="saveSettingsBtn">Simpan pengaturan</button>
+          </div>
+        </section>
+
+        <section class="panel stack" style="margin-top:14px">
+          <div>
+            <h2>Pasang aplikasi</h2>
+            <p class="muted small-text" id="installHint"></p>
+          </div>
+          <button type="button" class="primary" id="installBtn" hidden>Pasang di layar utama</button>
+        </section>
+
+        <section class="panel stack" style="margin-top:14px">
+          <div>
+            <h2>Cadangan data</h2>
+            <p class="muted small-text">Data utama tersimpan di cloud. Unduh cadangan berkala sebagai salinan tambahan.</p>
+          </div>
+          <button type="button" id="backupBtn">⇩ Unduh cadangan (JSON)</button>
+        </section>
+
+        <p class="footer">Sorentho Garage Kasir v<span id="appVersion">2.2.0</span></p>
+      </section>
+
+    </main>
+
+    <!-- Bar keranjang (mobile) -->
+    <div class="sheetbar" id="sheetBar">
+      <div>
+        <div class="lbl" id="barCount">0 item</div>
+        <strong id="barTotal">Rp0</strong>
+      </div>
+      <button type="button" class="primary" id="openCart">Lihat keranjang</button>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Navigasi utama: bawah di ponsel, sidebar di desktop -->
+    <nav class="tabbar" aria-label="Navigasi utama">
+      <div class="nav-brand">
+        <img src="assets/logo.png" alt="">
+        <span>SORENTHO GARAGE<small>POINT OF SALE</small></span>
+      </div>
+      <span class="nav-section-label">MENU UTAMA</span>
+      <button type="button" class="tab active" data-tab="kasir" aria-current="page">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg><span class="tab-label">Kasir</span>
+      </button>
+      <button type="button" class="tab" data-tab="produk">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM8 9h8M8 13h8M8 17h4"/></svg><span class="tab-label">Produk</span>
+      </button>
+      <button type="button" class="tab" data-tab="laporan">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h17M8 16v-5M13 16V7M18 16v-8"/></svg><span class="tab-label">Laporan</span>
+      </button>
+      <button type="button" class="tab" data-tab="riwayat">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg><span class="tab-label">Riwayat</span>
+      </button>
+      <button type="button" class="tab" data-tab="pengaturan">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="m19.4 15 .1.1 1.1.9-1.5 2.6-1.4-.6a8 8 0 0 1-1.4.8l-.2 1.5h-3l-.3-1.5a8 8 0 0 1-1.4-.8l-1.4.6-1.5-2.6 1.2-1a7 7 0 0 1 0-1.7l-1.2-1 1.5-2.6 1.4.6a8 8 0 0 1 1.4-.8l.3-1.5h3l.2 1.5a8 8 0 0 1 1.4.8l1.4-.6 1.5 2.6-1.1.9a7 7 0 0 1 0 1.8Z" transform="translate(-1 -1) scale(.95)"/></svg><span class="tab-label">Pengaturan</span>
+      </button>
+      <div class="nav-spacer"></div>
+      <div class="nav-footnote"><span class="nav-status-dot"></span>Data tersinkron ke cloud</div>
+    </nav>
+
+    <!-- ============ MODAL ============ -->
+
+    <!-- Produk (tambah / edit) -->
+    <div class="modalback" id="productModal" role="dialog" aria-modal="true" aria-labelledby="productTitle">
+      <div class="modal">
+        <h3 id="productTitle">Tambah produk</h3>
+        <div class="formgrid">
+          <div class="full">
+            <label for="pName">Nama produk</label>
+            <input id="pName" placeholder="Contoh: Lampu LED H4" autocomplete="off">
+          </div>
+          <div>
+            <label for="pSku">SKU / kode</label>
+            <input id="pSku" placeholder="SG-010" autocomplete="off">
+          </div>
+          <div>
+            <label for="pCategory">Jenis produk</label>
+            <select id="pCategory"></select>
+          </div>
+          <div>
+            <label for="pType">Tipe</label>
+            <select id="pType">
+              <option value="barang">Barang (ada stok)</option>
+              <option value="jasa">Jasa (tanpa stok)</option>
+            </select>
+          </div>
+          <div>
+            <label for="pPrice">Harga (Rp)</label>
+            <input type="number" inputmode="numeric" min="0" id="pPrice" placeholder="150000">
+          </div>
+          <div id="stockField">
+            <label for="pStock">Stok awal</label>
+            <input type="number" inputmode="numeric" min="0" id="pStock" placeholder="10">
+          </div>
+          <div id="minField">
+            <label for="pMin">Ambang stok menipis</label>
+            <input type="number" inputmode="numeric" min="0" id="pMin" value="3">
+          </div>
+        </div>
+        <p class="note" id="productNote" hidden>Stok diubah lewat tombol "+ Stok" agar setiap perubahan tercatat.</p>
+        <div class="modalactions">
+          <button type="button" id="pCancel">Batal</button>
+          <button type="button" class="primary" id="pSave">Simpan produk</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tambah stok -->
+    <div class="modalback" id="restockModal" role="dialog" aria-modal="true" aria-labelledby="restockTitle">
+      <div class="modal">
+        <h3 id="restockTitle">Tambah stok</h3>
+        <p id="restockInfo"></p>
+        <div class="field">
+          <label for="restockQty">Jumlah yang ditambahkan</label>
+          <input type="number" inputmode="numeric" min="1" id="restockQty" placeholder="Contoh: 10">
+        </div>
+        <div class="modalactions">
+          <button type="button" id="rCancel">Batal</button>
+          <button type="button" class="primary" id="rSave">Tambah stok</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Jenis produk (tambah / ubah) -->
+    <div class="modalback" id="categoryModal" role="dialog" aria-modal="true" aria-labelledby="catTitle">
+      <div class="modal">
+        <h3 id="catTitle">Jenis produk baru</h3>
+        <div class="field">
+          <label for="catName">Nama jenis</label>
+          <input id="catName" placeholder="Contoh: Velg, Audio, Kaca Film" autocomplete="off" maxlength="40">
+        </div>
+        <div class="modalactions">
+          <button type="button" id="catCancel">Batal</button>
+          <button type="button" class="primary" id="catSave">Simpan</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Riwayat stok per produk -->
+    <div class="modalback" id="movementsModal" role="dialog" aria-modal="true" aria-labelledby="movTitle">
+      <div class="modal">
+        <h3 id="movTitle">Riwayat stok</h3>
+        <div class="list" id="movList"></div>
+        <div class="modalactions">
+          <button type="button" id="movClose">Tutup</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Struk -->
+    <div class="modalback" id="receiptModal" role="dialog" aria-modal="true" aria-labelledby="receiptTitle">
+      <div class="modal">
+        <h3 id="receiptTitle">Struk</h3>
+        <div class="receipt-wrap" id="receiptBody"></div>
+        <div class="action-grid">
+          <button type="button" id="rPng">⇩ Simpan gambar</button>
+          <button type="button" id="rShare" hidden>↗ Bagikan</button>
+          <button type="button" id="rPrint">🖨 Cetak</button>
+          <button type="button" class="danger" id="rVoid" hidden>Batalkan transaksi</button>
+          <button type="button" class="primary" id="receiptClose">Tutup</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ralat / pembatalan transaksi -->
+    <div class="modalback" id="voidModal" role="dialog" aria-modal="true" aria-labelledby="voidTitle">
+      <div class="modal">
+        <h3 id="voidTitle">Batalkan transaksi?</h3>
+        <p>Stok produk akan dikembalikan. Transaksi tetap tercatat di riwayat dengan status <strong>Dibatalkan</strong>. Jika perlu, buat transaksi baru setelah itu.</p>
+        <div class="field">
+          <label for="voidReason">Alasan pembatalan (wajib)</label>
+          <textarea id="voidReason" rows="3" placeholder="Contoh: salah input jumlah, pelanggan batal beli"></textarea>
+        </div>
+        <div class="modalactions">
+          <button type="button" id="voidCancel">Batal</button>
+          <button type="button" class="danger" id="voidOk">Ya, batalkan</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QRIS layar penuh -->
+    <div class="modalback" id="qrisModal" role="dialog" aria-modal="true" aria-label="QRIS">
+      <div class="modal qris-modal">
+        <p class="qris-title">Pindai untuk membayar</p>
+        <img id="qrisImg" alt="QRIS toko">
+        <p class="qris-amount" id="qrisAmount"></p>
+        <div class="modalactions">
+          <button type="button" class="primary" id="qrisClose">Tutup</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Konfirmasi -->
+    <div class="modalback" id="confirmModal" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <div class="modal">
+        <h3 id="confirmTitle">Konfirmasi</h3>
+        <p id="confirmMsg"></p>
+        <div class="modalactions">
+          <button type="button" id="confirmCancel">Batal</button>
+          <button type="button" class="primary" id="confirmOk">Ya</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Area khusus cetak -->
+  <div id="print-area"></div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
+  <script src="supabase-config.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>

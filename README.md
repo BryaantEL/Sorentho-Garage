@@ -1,4 +1,4 @@
-# Sorentho Garage Kasir — v2.2.0
+# Sorentho Garage Kasir — v2.2.1
 
 Aplikasi kasir berbasis web (PWA). Data toko disimpan di Supabase dan dibagikan antar perangkat yang masuk ke akun pemilik yang sama. IndexedDB di browser hanya menjadi cache; transaksi dan perubahan data memerlukan koneksi internet.
 

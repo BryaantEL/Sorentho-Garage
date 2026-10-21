@@ -1,11 +1,11 @@
 /* ==========================================================================
-   Sorentho Garage Kasir — v2.2.0
+   Sorentho Garage Kasir — v2.2.1
    Vanilla JS PWA. Data utama di Supabase, cache perangkat di IndexedDB.
    ========================================================================== */
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.2.0';
+  const APP_VERSION = '2.2.1';
   const DB_NAME = 'sorentho-kasir';
   const DB_VERSION = 2;
   const CART_KEY = 'sg_cart_v1';
@@ -985,7 +985,7 @@
             ? '<span class="pill blue">Jasa</span>'
             : `<span class="pill${low ? ' low' : ''}">Stok ${p.stock}</span>`;
         return `
-          <div class="item${active ? '' : ' inactive'}">
+          <div class="item manage-item${active ? '' : ' inactive'}">
             <div class="main">
               <div class="title">${esc(p.name)}</div>
               <div class="meta">${esc(p.sku || 'Tanpa SKU')} · ${esc(categoryOf(p))} · ${svc ? 'Jasa' : 'Barang'}</div>

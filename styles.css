@@ -448,6 +448,27 @@ button.item:hover { filter: brightness(1.08); }
 .item .side strong { font-size: 15px; }
 .actions { display: flex; gap: 6px; }
 
+@media (max-width: 639px) {
+  .manage-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .manage-item .side {
+    width: 100%;
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+  }
+  .manage-item .actions {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+  .manage-item .actions button {
+    flex: 0 0 auto;
+  }
+}
+
 /* ---------- Settings ---------- */
 .footer { margin-top: 6px; }
 

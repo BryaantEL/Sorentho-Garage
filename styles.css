@@ -790,6 +790,35 @@ body.kasir-tab { padding-bottom: calc(var(--tabh) + var(--safe-b) + 84px); }
   overflow: hidden;
 }
 .qris-preview img { max-width: 220px; width: 100%; height: auto; border-radius: 10px; background: #fff; }
+.transfer-account {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel2);
+  overflow-wrap: anywhere;
+}
+.transfer-account strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.transfer-account span { color: var(--muted); font-size: 13px; }
+.transfer-proof-preview {
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--input);
+}
+.transfer-proof-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.receipt-proof { margin: 12px auto 0; max-width: 420px; }
+.receipt-proof h4 { margin: 0 0 8px; }
+.receipt-proof img { display: block; max-width: 100%; max-height: 420px; margin: auto; object-fit: contain; border-radius: 10px; }
 .qris-modal { text-align: center; width: min(420px, 100%); }
 .qris-modal img {
   width: 100%;

@@ -208,6 +208,49 @@ const check = async (name, fn) => {
     assert.ok((await page.textContent('#profitDayN')).includes('2 dihitung'));
   });
 
+  await check('rekening transfer tersimpan dan bukti opsional terlihat di riwayat transaksi', async () => {
+    await tab('pengaturan');
+    await page.fill('#transferBank', 'BCA');
+    await page.fill('#transferAccountName', 'Pemilik Toko');
+    await page.fill('#transferAccountNumber', '0123456789');
+    await page.click('#saveSettingsBtn');
+    await tab('kasir');
+    await page.click('[data-add="p4"]');
+    await openCart();
+    await page.click('[data-method="transfer"]');
+    assert.ok((await page.textContent('#transferAccountDisplay')).includes('0123456789'));
+    await page.setInputFiles('#transferProofFile', IMAGE_FIXTURE);
+    await page.waitForSelector('#transferProofPreview img');
+    await page.click('#checkoutBtn');
+    await page.waitForSelector('#receiptModal.open');
+    assert.ok((await page.textContent('#receiptBody')).includes('BCA'));
+    assert.ok(await page.locator('#receiptBody .receipt-proof img').isVisible());
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('e2e-shop-state')).payload);
+    const transfer = saved.transactions.find((transaction) => transaction.paymentMethod === 'transfer');
+    assert.strictEqual(transfer.transferAccount.number, '0123456789');
+    assert.ok(transfer.transferProof.startsWith('data:image/jpeg;base64,'));
+    await page.click('#receiptClose');
+    await closeCart();
+
+    await tab('riwayat');
+    await page.click(`#historyList [data-view="${transfer.id}"]`);
+    await page.waitForSelector('#receiptBody .receipt-proof img');
+    await page.click('#receiptClose');
+    await tab('kasir');
+    await page.click('[data-add="p4"]');
+    await openCart();
+    await page.click('[data-method="transfer"]');
+    assert.ok(await page.locator('#checkoutBtn').isEnabled(), 'bukti transfer harus opsional');
+    await page.click('#checkoutBtn');
+    await page.waitForSelector('#receiptModal.open');
+    const afterOptional = await page.evaluate(() => JSON.parse(localStorage.getItem('e2e-shop-state')).payload);
+    const optionalTransfer = afterOptional.transactions.find((transaction) => transaction.id !== transfer.id
+      && transaction.paymentMethod === 'transfer');
+    assert.strictEqual(optionalTransfer.transferProof, null);
+    await page.click('#receiptClose');
+    await closeCart();
+  });
+
   // ---------- Jenis produk ----------
   await check('jenis produk baru "Velg" bisa ditambahkan', async () => {
     await tab('produk');
@@ -239,8 +282,24 @@ const check = async (name, fn) => {
     assert.ok((await row.textContent()).includes('Velg Racing'));
   });
 
-  await check('jenis yang masih dipakai tidak bisa dihapus', async () => {
-    assert.ok(await page.locator('[data-cat-del="Velg Racing"]').isDisabled());
+  await check('tombol hapus jenis menolak jenis yang masih digunakan', async () => {
+    assert.ok(await page.locator('[data-cat-del="Velg Racing"]').isEnabled());
+    await page.click('[data-cat-del="Velg Racing"]');
+    assert.ok((await page.textContent('#toast')).includes('masih dipakai'));
+  });
+
+  await check('hapus produk dan stok menghapus produk beserta riwayat stoknya', async () => {
+    const productRow = page.locator('#manageList .item').filter({ hasText: 'Velg Racing 17' });
+    const productId = await productRow.locator('[data-edit]').getAttribute('data-edit');
+    await productRow.locator('[data-delete]').click();
+    await page.click('#confirmOk');
+    await page.waitForFunction(() => !document.getElementById('manageList').textContent.includes('Velg Racing 17'));
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('e2e-shop-state')).payload);
+    assert.ok(!saved.products.some((product) => product.sku === 'SG-V17'));
+    assert.ok(!saved.movements.some((movement) => movement.productId === productId));
+    await page.click('[data-cat-del="Velg Racing"]');
+    await page.click('#confirmOk');
+    assert.ok(!(await page.textContent('#catList')).includes('Velg Racing'));
   });
 
   await check('jenis kosong bisa dihapus', async () => {

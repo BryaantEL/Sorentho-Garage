@@ -143,9 +143,18 @@
               <div id="refBox" class="field" hidden>
                 <button type="button" class="ghost big" id="showQris" hidden>📱 Tampilkan QRIS ke pelanggan</button>
                 <p class="note" id="qrisHint" hidden>Belum ada QRIS. Unggah gambar QRIS di menu Pengaturan.</p>
-                <label for="ref" class="mt"><span id="refLabel">Nomor referensi</span></label>
+                <label for="ref" class="mt">Nomor referensi QRIS</label>
                 <input id="ref" placeholder="Nomor bukti / referensi" autocomplete="off">
                 <p class="note">Pembayaran non-tunai dikonfirmasi manual. Pastikan dana sudah masuk sebelum menyimpan.</p>
+              </div>
+
+              <div id="transferBox" class="field" hidden>
+                <div class="transfer-account" id="transferAccountDisplay"></div>
+                <label class="filebtn" for="transferProofFile">Unggah bukti transfer (opsional)</label>
+                <input type="file" id="transferProofFile" accept="image/png,image/jpeg,image/webp" hidden>
+                <div class="transfer-proof-preview" id="transferProofPreview" hidden></div>
+                <button type="button" class="ghost small" id="transferProofRemove" hidden>Hapus bukti</button>
+                <p class="note">Gambar dikompres dan disimpan bersama transaksi. Maksimal 10 MB sebelum diproses.</p>
               </div>
 
               <div class="field">
@@ -361,6 +370,18 @@
             <input id="storeInfo" placeholder="Alamat bengkel atau nomor telepon" autocomplete="off">
           </div>
           <div>
+            <label for="transferBank">Nama bank (opsional)</label>
+            <input id="transferBank" placeholder="Contoh: BCA" autocomplete="off" maxlength="40">
+          </div>
+          <div>
+            <label for="transferAccountName">Nama pemilik rekening (opsional)</label>
+            <input id="transferAccountName" placeholder="Sesuai nama di rekening" autocomplete="off" maxlength="80">
+          </div>
+          <div>
+            <label for="transferAccountNumber">Nomor rekening untuk transfer</label>
+            <input id="transferAccountNumber" inputmode="text" placeholder="Masukkan nomor rekening" autocomplete="off" maxlength="40">
+          </div>
+          <div>
             <label for="paperSize">Lebar kertas struk</label>
             <select id="paperSize">
               <option value="58">Printer 58 mm</option>
@@ -402,7 +423,7 @@
           <button type="button" class="danger" id="resetSalesBtn">Reset transaksi &amp; riwayat</button>
         </section>
 
-        <p class="footer">Sorentho Garage Kasir v<span id="appVersion">2.3.0</span></p>
+        <p class="footer">Sorentho Garage Kasir v<span id="appVersion">2.4.0</span></p>
       </section>
 
     </main>

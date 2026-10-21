@@ -4,7 +4,7 @@
  * - Saat offline: gunakan salinan dari cache.
  * Naikkan CACHE_VERSION setiap kali ada perubahan file agar cache lama dibersihkan.
  */
-const CACHE_VERSION = 'sorentho-kasir-v2.3.0';
+const CACHE_VERSION = 'sorentho-kasir-v2.4.0';
 
 const APP_SHELL = [
   './',

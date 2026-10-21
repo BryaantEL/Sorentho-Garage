@@ -1,4 +1,4 @@
-# Sorentho Garage Kasir — v2.3.0
+# Sorentho Garage Kasir — v2.4.0
 
 Aplikasi kasir berbasis web (PWA). Data toko disimpan di Supabase dan dibagikan antar perangkat yang masuk ke akun pemilik yang sama. IndexedDB di browser hanya menjadi cache; transaksi dan perubahan data memerlukan koneksi internet.
 
@@ -49,7 +49,7 @@ Buka aplikasi di Chrome Android, tekan **⋮**, lalu pilih **Instal aplikasi** a
 | **Produk** | Jenis produk (buat, ubah, hapus), harga modal, tambah stok, stok opname, riwayat stok, nonaktifkan produk |
 | **Laporan** | Omzet dan laba kotor hari, minggu, dan bulan; grafik 7 hari, 8 minggu, atau 12 bulan; produk terlaris; metode bayar; target dan saran |
 | **Riwayat** | Daftar transaksi, struk, simpan struk sebagai gambar, bagikan, cetak, batalkan transaksi, export CSV |
-| **Pengaturan** | Akun, QRIS toko, logo toko, nama dan alamat toko, lebar kertas struk, unduh dan pulihkan backup JSON, reset riwayat transaksi dan pergerakan stok |
+| **Pengaturan** | Akun, QRIS dan rekening transfer, logo toko, nama dan alamat toko, lebar kertas struk, unduh dan pulihkan backup JSON, reset riwayat transaksi dan pergerakan stok |
 
 Reset riwayat di **Pengaturan** menghapus transaksi beserta riwayat pergerakan stok dari cloud, mengatur ulang nomor transaksi, dan tidak mengubah stok produk. Unduh cadangan terlebih dahulu jika masih memerlukan salinan data lama.
 
@@ -67,6 +67,9 @@ Di **Produk**, tekan **Opname** pada barang, masukkan jumlah fisik yang dihitung
 2. Saat pelanggan membayar dengan QRIS, pilih metode **QRIS** di kasir, lalu tekan **Tampilkan QRIS ke pelanggan**. Gambar tampil layar penuh beserta total bayar.
 3. Setelah pembayaran masuk, isi nomor referensi lalu selesaikan transaksi.
 
+### Transfer dan bukti pembayaran
+Atur nama bank, nama pemilik, dan nomor rekening di **Pengaturan → Pengaturan toko**. Saat metode **Transfer** dipilih, nomor rekening ditampilkan di keranjang. Bukti transfer berupa PNG, JPG, atau WebP dapat diunggah secara opsional; gambar dikompres lalu disimpan bersama transaksi agar dapat dilihat dari **Riwayat → transaksi**. Riwayat transaksi menyimpan salinan rekening yang digunakan saat itu. Pastikan dana masuk sebelum menyelesaikan transaksi.
+
 ### Struk sebagai gambar
 Di **Riwayat**, ketuk transaksi, lalu tekan **Simpan gambar**. File PNG tersimpan di folder Download HP. Tombol **Bagikan** juga tersedia jika HP mendukungnya (misalnya untuk dikirim ke WhatsApp).
 
@@ -82,6 +85,7 @@ Menu **Laporan** memberi saran target minggu dan bulan dari rata-rata penjualan 
 - **Cadangan.** Unduh **cadangan JSON** secara berkala di Pengaturan sebagai salinan tambahan.
 - **Kunci.** Publishable/anon key boleh ada di frontend; `service_role` key dan password akun tidak boleh dimasukkan ke file aplikasi.
 - **Pembayaran QRIS dan transfer dicatat manual.** Pastikan dana sudah masuk sebelum menyimpan transaksi.
+- **Produk.** Tombol **Hapus & stok** menghapus produk dan riwayat pergerakan stoknya secara permanen; catatan transaksi lama tetap tersimpan. Jenis yang masih dipakai produk tidak dapat dihapus sebelum produk dipindahkan.
 - **Logo.** Logo bawaan memakai file PNG terbaru yang diberikan. Jika ingin memakai logo lain, unggah di **Pengaturan → Logo toko**.
 - **Pembaruan dari versi 1.** Jika dibuka di alamat yang sama, data versi 1 otomatis dipindah ke versi 2.
 

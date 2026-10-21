@@ -1,11 +1,11 @@
 /* ==========================================================================
-   Sorentho Garage Kasir — v2.3.0
+   Sorentho Garage Kasir — v2.4.0
    Vanilla JS PWA. Data utama di Supabase, cache perangkat di IndexedDB.
    ========================================================================== */
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.3.0';
+  const APP_VERSION = '2.4.0';
   const DB_NAME = 'sorentho-kasir';
   const DB_VERSION = 2;
   const CART_KEY = 'sg_cart_v1';
@@ -66,6 +66,9 @@
     paper: '58',
     lastNo: 0,
     categories: [...DEFAULT_CATEGORIES],
+    transferBank: '',
+    transferAccountName: '',
+    transferAccountNumber: '',
     qris: null,
     logo: null,
     targetWeek: 0,
@@ -95,6 +98,8 @@
   let editingId = null;
   let editingCat = null;
   let pendingRestore = null;
+  let pendingTransferProof = null;
+  let transferProofLoading = false;
   let currentReceipt = null;
   let reportRange = 'day';
 
@@ -183,6 +188,9 @@
       ? { ...defaultSettings(), ...value.settings }
       : defaultSettings();
     if (!Array.isArray(settings.categories)) settings.categories = [...DEFAULT_CATEGORIES];
+    ['transferBank', 'transferAccountName', 'transferAccountNumber'].forEach((key) => {
+      if (typeof settings[key] !== 'string') settings[key] = '';
+    });
     return {
       settings,
       products: Array.isArray(value.products) ? value.products : [],
@@ -649,6 +657,10 @@
     $('paid').value = '';
     $('ref').value = '';
     $('customer').value = '';
+    $('transferProofFile').value = '';
+    pendingTransferProof = null;
+    transferProofLoading = false;
+    renderTransferProofPreview();
     ui.method = 'tunai';
   }
 
@@ -685,10 +697,15 @@
     const paid = cash ? wholeNumber($('paid').value) : total;
     const change = cash ? Math.max(0, paid - total) : 0;
     const short = cash && items.length > 0 && paid < total;
-    const refMissing = !cash && items.length > 0 && !$('ref').value.trim();
+    const refMissing = ui.method === 'qris' && items.length > 0 && !$('ref').value.trim();
+    const transferAccountMissing = ui.method === 'transfer' && items.length > 0
+      && !state.settings.transferAccountNumber.trim();
     const qtyTotal = items.reduce((s, i) => s + i.qty, 0);
 
-    return { items, qtyTotal, subtotal, discountType, discountValue, discount, total, paid, change, short, refMissing, cash };
+    return {
+      items, qtyTotal, subtotal, discountType, discountValue, discount, total, paid, change,
+      short, refMissing, transferAccountMissing, cash,
+    };
   }
 
   /* ------------------------------------------------------------------------
@@ -700,6 +717,8 @@
     if (!c.items.length) return;
     if (c.short) return toast('Uang dibayar masih kurang');
     if (c.refMissing) return toast('Isi nomor referensi pembayaran');
+    if (c.transferAccountMissing) return toast('Atur nomor rekening transfer di menu Pengaturan');
+    if (transferProofLoading) return toast('Tunggu bukti transfer selesai diproses');
 
     const stale = c.items.find((i) => {
       const p = findProduct(i.productId);
@@ -730,7 +749,13 @@
       paymentMethod: method,
       paid: c.paid,
       change: c.change,
-      reference: method === 'tunai' ? '' : $('ref').value.trim(),
+      reference: method === 'qris' ? $('ref').value.trim() : '',
+      transferAccount: method === 'transfer' ? {
+        bank: state.settings.transferBank,
+        name: state.settings.transferAccountName,
+        number: state.settings.transferAccountNumber,
+      } : null,
+      transferProof: method === 'transfer' ? pendingTransferProof : null,
       status: 'selesai',
     };
 
@@ -928,20 +953,25 @@
     document.querySelectorAll('#methods [data-method]').forEach((b) =>
       b.classList.toggle('active', b.dataset.method === ui.method));
     $('cashBox').hidden = !c.cash;
-    $('refBox').hidden = c.cash;
-    $('refLabel').textContent = `Nomor referensi ${METHOD_LABEL[ui.method]}`;
+    const isTransfer = ui.method === 'transfer';
+    $('refBox').hidden = ui.method !== 'qris';
+    $('transferBox').hidden = !isTransfer;
     const isQris = ui.method === 'qris';
     $('showQris').hidden = !isQris || !state.settings.qris;
     $('qrisHint').hidden = !(isQris && !state.settings.qris);
+    renderTransferAccount();
     renderQuick(c);
 
     let msg = '';
     if (c.short) msg = 'Uang dibayar masih kurang. Transaksi belum bisa diproses.';
-    else if (c.refMissing) msg = 'Isi nomor referensi (bukti transfer atau QRIS) sebelum menyimpan.';
+    else if (c.refMissing) msg = 'Isi nomor referensi QRIS sebelum menyimpan.';
+    else if (c.transferAccountMissing) msg = 'Atur nomor rekening transfer di menu Pengaturan.';
+    else if (transferProofLoading) msg = 'Bukti transfer sedang diproses…';
     $('warn').textContent = msg;
     $('warn').classList.toggle('show', Boolean(msg));
 
-    $('checkoutBtn').disabled = !c.items.length || c.short || c.refMissing || busy;
+    $('checkoutBtn').disabled = !c.items.length || c.short || c.refMissing
+      || c.transferAccountMissing || transferProofLoading || busy;
   }
 
   function renderQuick(c) {
@@ -982,7 +1012,7 @@
             <div class="side">
               <div class="actions">
                 <button type="button" class="small" data-cat-edit="${esc(c)}">Ubah</button>
-                <button type="button" class="small danger" data-cat-del="${esc(c)}" ${n ? 'disabled title="Masih dipakai produk"' : ''}>Hapus</button>
+                <button type="button" class="small danger" data-cat-del="${esc(c)}" title="${n ? 'Pindahkan produk terlebih dahulu' : 'Hapus jenis produk'}">Hapus</button>
               </div>
             </div>
           </div>`;
@@ -1015,6 +1045,7 @@
               ${status}
               <div class="actions">
                 <button type="button" class="small" data-edit="${esc(p.id)}">Ubah</button>
+                <button type="button" class="small danger" data-delete="${esc(p.id)}">Hapus &amp; stok</button>
                 ${svc ? '' : `<button type="button" class="small" data-restock="${esc(p.id)}">+ Stok</button>
                 <button type="button" class="small ghost" data-stocktake="${esc(p.id)}">Opname</button>
                 <button type="button" class="small ghost" data-moves="${esc(p.id)}">Riwayat</button>`}
@@ -1125,6 +1156,32 @@
 
     closeModal('productModal');
     editingId = null;
+    renderAll();
+  }
+
+  async function deleteProduct(id) {
+    if (busy) return;
+    const product = findProduct(id);
+    if (!product) return toast('Produk tidak ditemukan');
+    const productMovements = state.movements.filter((record) => record.productId === id);
+    const ok = await confirmDialog({
+      title: 'Hapus produk dan stok?',
+      message: `"${product.name}" dan stok ${isService(product) ? 'jasa' : `${product.stock} unit`} beserta ${productMovements.length} riwayat stok akan dihapus permanen. Riwayat transaksi lama tetap disimpan.`,
+      okText: 'Hapus produk',
+      danger: true,
+    });
+    if (!ok) return;
+
+    const saved = await safeWrite(['products', 'movements'], (idb) => {
+      idb.objectStore('products').delete(id);
+      productMovements.forEach((record) => idb.objectStore('movements').delete(record.id));
+    }, `Produk "${product.name}" dan stoknya dihapus`);
+    if (!saved) return;
+
+    state.products = state.products.filter((item) => item.id !== id);
+    state.movements = state.movements.filter((record) => record.productId !== id);
+    delete cart[id];
+    saveCart();
     renderAll();
   }
 
@@ -1285,6 +1342,7 @@
       if (!ok) return;
       state.settings = next;
       state.products = state.products.map((p) => (p.category === editingCat ? { ...p, category: name } : p));
+      if (ui.category === editingCat) ui.category = name;
     }
 
     closeModal('categoryModal');
@@ -1306,6 +1364,7 @@
     const saved = await saveSettingsRecord(next);
     if (!saved) return;
     state.settings = next;
+    if (ui.category === name) ui.category = '';
     renderAll();
     toast(`Jenis "${name}" dihapus`);
   }
@@ -1552,6 +1611,7 @@
     const s = state.settings;
     const paper = s.paper === '80' ? 'p80' : 'p58';
     const isCash = t.paymentMethod === 'tunai';
+    const isTransfer = t.paymentMethod === 'transfer';
     const voided = t.status === 'dibatalkan';
 
     return `
@@ -1575,7 +1635,11 @@
         <div class="rline"><span>${esc(METHOD_LABEL[t.paymentMethod] || 'Tunai')}</span><span>${rupiah(t.paid)}</span></div>
         ${isCash
     ? `<div class="rline strong"><span>Kembalian</span><span>${rupiah(t.change)}</span></div>`
-    : `<div class="rline"><span>Ref.</span><span>${esc(t.reference || '-')}</span></div>`}
+    : isTransfer
+      ? `<div class="rline"><span>Rekening</span><span>${esc(t.transferAccount?.number || '-')}</span></div>
+        ${t.transferAccount?.bank ? `<div class="rline"><span>Bank</span><span>${esc(t.transferAccount.bank)}</span></div>` : ''}
+        ${t.transferAccount?.name ? `<div class="rline"><span>Atas nama</span><span>${esc(t.transferAccount.name)}</span></div>` : ''}`
+      : `<div class="rline"><span>Ref.</span><span>${esc(t.reference || '-')}</span></div>`}
         ${voided ? `<div class="stamp">DIBATALKAN</div><p class="c">Alasan: ${esc(t.voidReason || '-')}</p>` : ''}
         <hr>
         <p class="c">Terima kasih telah berkunjung!<br>${esc(s.name)}</p>
@@ -1584,7 +1648,10 @@
 
   function showReceipt(t) {
     currentReceipt = t;
-    $('receiptBody').innerHTML = receiptHTML(t);
+    const proof = t.paymentMethod === 'transfer' && t.transferProof
+      ? `<section class="receipt-proof"><h4>Bukti transfer</h4><a href="${esc(t.transferProof)}" target="_blank" rel="noopener"><img src="${esc(t.transferProof)}" alt="Bukti transfer ${esc(t.id)}"></a></section>`
+      : '';
+    $('receiptBody').innerHTML = receiptHTML(t) + proof;
     $('rVoid').hidden = t.status === 'dibatalkan';
     $('rShare').hidden = !canShareFiles();
     openModal('receiptModal');
@@ -1843,6 +1910,92 @@
     openModal('qrisModal');
   }
 
+  function renderTransferAccount() {
+    const { transferBank, transferAccountName, transferAccountNumber } = state.settings;
+    $('transferAccountDisplay').innerHTML = transferAccountNumber
+      ? `<strong>Nomor rekening: ${esc(transferAccountNumber)}</strong>
+        ${transferBank ? `<span>${esc(transferBank)}</span>` : ''}
+        ${transferAccountName ? `<span>Atas nama ${esc(transferAccountName)}</span>` : ''}`
+      : '<span>Nomor rekening belum diatur. Tambahkan di menu Pengaturan.</span>';
+    renderTransferProofPreview();
+  }
+
+  function renderTransferProofPreview() {
+    const preview = $('transferProofPreview');
+    const remove = $('transferProofRemove');
+    preview.hidden = !pendingTransferProof;
+    remove.hidden = !pendingTransferProof;
+    preview.innerHTML = pendingTransferProof
+      ? `<img src="${esc(pendingTransferProof)}" alt="Pratinjau bukti transfer">`
+      : '';
+  }
+
+  async function uploadTransferProof(file) {
+    if (!file) return;
+    pendingTransferProof = null;
+    renderTransferProofPreview();
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      $('transferProofFile').value = '';
+      return toast('Pilih gambar PNG, JPG, atau WebP');
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      $('transferProofFile').value = '';
+      return toast('Ukuran gambar maksimal 10 MB');
+    }
+
+    transferProofLoading = true;
+    renderSummary();
+    try {
+      const image = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      const dataUrl = await new Promise((resolve, reject) => {
+        image.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          try {
+            const scale = Math.min(1, 1200 / Math.max(image.width, image.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(image.width * scale));
+            canvas.height = Math.max(1, Math.round(image.height * scale));
+            const context = canvas.getContext('2d');
+            if (!context) return reject(new Error('Canvas gambar tidak tersedia'));
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.72));
+          } catch (err) {
+            reject(err);
+          }
+        };
+        image.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('Gambar tidak bisa dibaca'));
+        };
+        image.src = objectUrl;
+      });
+      if (dataUrl.length > 700 * 1024) {
+        throw new Error('Hasil kompresi gambar masih terlalu besar');
+      }
+      pendingTransferProof = dataUrl;
+      toast('Bukti transfer siap disimpan bersama transaksi');
+    } catch (err) {
+      console.error('Gagal memproses bukti transfer', err);
+      $('transferProofFile').value = '';
+      toast(err.message === 'Hasil kompresi gambar masih terlalu besar'
+        ? 'Bukti transfer terlalu besar setelah dikompres. Pilih gambar yang lebih kecil.'
+        : 'Gambar bukti transfer tidak bisa diproses');
+    } finally {
+      transferProofLoading = false;
+      renderSummary();
+    }
+  }
+
+  function removeTransferProof() {
+    pendingTransferProof = null;
+    $('transferProofFile').value = '';
+    renderTransferProofPreview();
+    renderSummary();
+  }
+
   /* ------------------------------------------------------------------------
      Pengaturan, ekspor, cadangan
      ------------------------------------------------------------------------ */
@@ -1851,6 +2004,9 @@
       ...state.settings,
       name: $('storeName').value.trim() || 'Sorentho Garage',
       info: $('storeInfo').value.trim(),
+      transferBank: $('transferBank').value.trim(),
+      transferAccountName: $('transferAccountName').value.trim(),
+      transferAccountNumber: $('transferAccountNumber').value.trim(),
       paper: $('paperSize').value === '80' ? '80' : '58',
     };
     const ok = await saveSettingsRecord(next);
@@ -1898,6 +2054,9 @@
   function fillSettingsForm() {
     $('storeName').value = state.settings.name;
     $('storeInfo').value = state.settings.info || '';
+    $('transferBank').value = state.settings.transferBank || '';
+    $('transferAccountName').value = state.settings.transferAccountName || '';
+    $('transferAccountNumber').value = state.settings.transferAccountNumber || '';
     $('paperSize').value = state.settings.paper;
     renderQrisPreview();
     updateInstallUI();
@@ -1974,6 +2133,8 @@
       throw new Error('Daftar kategori di backup tidak valid.');
     }
     if (typeof settings.name !== 'string' || typeof settings.info !== 'string'
+      || ['transferBank', 'transferAccountName', 'transferAccountNumber'].some((key) =>
+        settings[key] !== undefined && typeof settings[key] !== 'string')
       || !['58', '80'].includes(String(settings.paper))) {
       throw new Error('Pengaturan toko di backup tidak valid.');
     }
@@ -2009,7 +2170,14 @@
         || !isWholeNumber(transaction.no, 1) || !isWholeNumber(transaction.total)
         || !Array.isArray(transaction.items) || !transaction.items.length
         || (transaction.status !== undefined
-          && !['selesai', 'dibatalkan'].includes(transaction.status))) {
+          && !['selesai', 'dibatalkan'].includes(transaction.status))
+        || (transaction.transferProof !== undefined && transaction.transferProof !== null
+          && (typeof transaction.transferProof !== 'string'
+            || !transaction.transferProof.startsWith('data:image/jpeg;base64,')
+            || transaction.transferProof.length > 700 * 1024))
+        || (transaction.transferAccount !== undefined && transaction.transferAccount !== null
+          && (!isRecord(transaction.transferAccount)
+            || ['bank', 'name', 'number'].some((key) => typeof transaction.transferAccount[key] !== 'string')))) {
         throw new Error('Ada data transaksi yang tidak valid di backup.');
       }
       const items = transaction.items.map((item) => {
@@ -2309,6 +2477,11 @@
     });
     on('showQris', 'click', openQrisModal);
     on('checkoutBtn', 'click', checkout);
+    on('transferProofFile', 'change', (e) => {
+      const file = e.target.files[0];
+      uploadTransferProof(file);
+    });
+    on('transferProofRemove', 'click', removeTransferProof);
     on('openCart', 'click', () => openSheet(true));
     on('closeSheet', 'click', () => openSheet(false));
     on('overlay', 'click', () => openSheet(false));
@@ -2320,6 +2493,7 @@
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.edit) openProductModal(b.dataset.edit);
+      else if (b.dataset.delete) deleteProduct(b.dataset.delete);
       else if (b.dataset.restock) openRestock(b.dataset.restock);
       else if (b.dataset.stocktake) openStocktake(b.dataset.stocktake);
       else if (b.dataset.moves) openMoves(b.dataset.moves);

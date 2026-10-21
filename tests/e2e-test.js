@@ -149,6 +149,19 @@ const check = async (name, fn) => {
     assert.strictEqual(await page.locator('#qrisRemove').isEnabled(), true);
   });
 
+  await check('harga modal barang dapat disimpan dan dipakai pada penjualan berikutnya', async () => {
+    await tab('produk');
+    await page.click('[data-edit="p1"]');
+    await page.fill('#pCost', '100000');
+    await page.click('#pSave');
+    await page.waitForSelector('#productModal', { state: 'hidden' });
+    await page.click('[data-edit="p4"]');
+    await page.fill('#pCost', '40000');
+    await page.click('#pSave');
+    await page.waitForSelector('#productModal', { state: 'hidden' });
+    assert.ok((await page.textContent('#manageList')).includes('Lampu LED H4'));
+  });
+
   // ---------- Kasir tunai ----------
   await check('tunai: transaksi pertama tersimpan SG-000001, stok 12 -> 10', async () => {
     await tab('kasir');
@@ -187,6 +200,12 @@ const check = async (name, fn) => {
     assert.ok((await page.textContent('#receiptBody')).includes('QR-TEST-01'));
     await page.click('#receiptClose');
     await closeCart();
+  });
+
+  await check('laporan laba kotor menghitung biaya modal yang tersimpan di transaksi', async () => {
+    await tab('laporan');
+    assert.ok((await page.textContent('#profitDay')).includes('205.000'));
+    assert.ok((await page.textContent('#profitDayN')).includes('2 dihitung'));
   });
 
   // ---------- Jenis produk ----------
@@ -276,6 +295,24 @@ const check = async (name, fn) => {
     await page.click('#movClose');
   });
 
+  await check('stok opname mencatat selisih dan alasan, lalu memperbarui stok', async () => {
+    await page.click('[data-stocktake="p1"]');
+    await page.waitForSelector('#stocktakeModal.open');
+    await page.fill('#stocktakePhysical', '12');
+    await page.click('#stocktakeSave');
+    assert.ok(await page.locator('#stocktakeModal').evaluate((element) => element.classList.contains('open')));
+    await page.fill('#stocktakeReason', 'Hasil hitung rak hari ini');
+    await page.click('#stocktakeSave');
+    await page.waitForSelector('#stocktakeModal', { state: 'hidden' });
+    const row = page.locator('#manageList .item').filter({ hasText: 'Lampu LED H4' });
+    assert.ok((await row.locator('.pill').textContent()).includes('Stok 12'));
+    await row.locator('[data-moves]').click();
+    await page.waitForSelector('#movementsModal.open');
+    const movements = await page.textContent('#movList');
+    assert.ok(movements.includes('Stok opname') && movements.includes('Hasil hitung rak hari ini'));
+    await page.click('#movClose');
+  });
+
   // ---------- Laporan ----------
   await check('laporan: kartu omzet & grafik 7 hari tampil', async () => {
     await tab('laporan');
@@ -359,6 +396,32 @@ const check = async (name, fn) => {
     const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#exportCsvBtn')]);
     const body = fs.readFileSync(await dl.path(), 'utf8');
     assert.ok(body.includes('Status') && body.includes('Dibatalkan'));
+  });
+
+  await check('backup dapat dipreview dan dipulihkan setelah konfirmasi', async () => {
+    await tab('pengaturan');
+    const [download] = await Promise.all([page.waitForEvent('download'), page.click('#backupBtn')]);
+    const backup = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
+    backup.settings.name = 'Nama dari backup';
+    backup.products.find((product) => product.id === 'p1').stock += 1;
+    const fixture = path.join(OUTPUT_DIR, 'backup-restore-fixture.json');
+    fs.writeFileSync(fixture, JSON.stringify(backup));
+
+    await page.setInputFiles('#restoreFile', fixture);
+    await page.waitForSelector('#restorePreviewModal.open');
+    assert.ok((await page.textContent('#restorePreviewText')).includes('Transaksi:'));
+    await page.fill('#restoreConfirmation', 'salah');
+    await page.click('#restoreConfirm');
+    assert.ok(await page.locator('#restorePreviewModal').evaluate((element) => element.classList.contains('open')));
+
+    await page.fill('#restoreConfirmation', 'PULIHKAN');
+    await page.click('#restoreConfirm');
+    await page.waitForSelector('#restorePreviewModal', { state: 'hidden' });
+    assert.strictEqual(await page.inputValue('#storeName'), 'Nama dari backup');
+    const cloud = await page.evaluate(() => JSON.parse(localStorage.getItem('e2e-shop-state')).payload);
+    assert.strictEqual(cloud.settings.name, 'Nama dari backup');
+    assert.strictEqual(cloud.products.find((product) => product.id === 'p1').stock,
+      backup.products.find((product) => product.id === 'p1').stock);
   });
 
   await check('reset menolak konfirmasi salah dan menghapus riwayat tanpa mengubah stok', async () => {

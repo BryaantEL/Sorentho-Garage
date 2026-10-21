@@ -497,6 +497,7 @@ button.item:hover { filter: brightness(1.08); }
 }
 .modal h3 { margin: 0 0 14px; font-size: 18px; }
 .modal p { margin: 0 0 8px; color: var(--muted); }
+#restorePreviewText { white-space: pre-line; }
 .formgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .formgrid .full { grid-column: 1 / -1; }
 .modalactions { display: flex; gap: 8px; margin-top: 18px; }
@@ -828,6 +829,7 @@ body.kasir-tab { padding-bottom: calc(var(--tabh) + var(--safe-b) + 84px); }
 .cards3 .stat .cap { font-size: 11px; line-height: 1.3; }
 .cards3 .stat .num { font-size: 15px; margin-top: 4px; }
 .cards3 .stat .hint { font-size: 10px; }
+.profit-cards .stat .hint { overflow-wrap: anywhere; }
 @media (min-width: 640px) {
   .cards3 { gap: 10px; }
   .cards3 .stat { padding: 12px 14px; }

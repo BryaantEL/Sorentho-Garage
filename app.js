@@ -1,18 +1,18 @@
 /* ==========================================================================
-   Sorentho Garage Kasir — v2.2.2
+   Sorentho Garage Kasir — v2.3.0
    Vanilla JS PWA. Data utama di Supabase, cache perangkat di IndexedDB.
    ========================================================================== */
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.2.2';
+  const APP_VERSION = '2.3.0';
   const DB_NAME = 'sorentho-kasir';
   const DB_VERSION = 2;
   const CART_KEY = 'sg_cart_v1';
   const THEME_KEY = 'sg_theme_v1';
   const DEFAULT_MIN_STOCK = 3;
   const METHOD_LABEL = { tunai: 'Tunai', qris: 'QRIS', transfer: 'Transfer' };
-  const MOVE_LABEL = { awal: 'Stok awal', penambahan: 'Tambah stok', penjualan: 'Penjualan', retur: 'Pembatalan transaksi' };
+  const MOVE_LABEL = { awal: 'Stok awal', penambahan: 'Tambah stok', penjualan: 'Penjualan', retur: 'Pembatalan transaksi', opname: 'Stok opname' };
   const DEFAULT_CATEGORIES = ['Lampu LED', 'Projector', 'Aksesori', 'Jasa'];
 
   const SEED_PRODUCTS = [
@@ -91,8 +91,10 @@
   let confirmResolve = null;
   let deferredInstall = null;
   let restockId = null;
+  let stocktakeId = null;
   let editingId = null;
   let editingCat = null;
+  let pendingRestore = null;
   let currentReceipt = null;
   let reportRange = 'day';
 
@@ -122,6 +124,15 @@
   const matchText = (p, q) => !q || `${p.name} ${p.sku || ''} ${categoryOf(p)}`.toLowerCase().includes(q);
   const validTxs = () => state.transactions.filter((t) => t.status !== 'dibatalkan');
   const sumOf = (list) => list.reduce((s, t) => s + t.total, 0);
+  const grossProfitOf = (tx) => {
+    if (!Array.isArray(tx.items) || tx.items.length === 0) return null;
+    const knownCosts = tx.items.every((item) =>
+      Number.isSafeInteger(item.costPrice) && item.costPrice >= 0
+      && Number.isSafeInteger(item.qty) && item.qty > 0);
+    if (!knownCosts) return null;
+    const costTotal = tx.items.reduce((sum, item) => sum + item.costPrice * item.qty, 0);
+    return Number.isSafeInteger(costTotal) ? tx.total - costTotal : null;
+  };
   const inRange = (t, from, to) => {
     const d = new Date(t.date);
     return d >= from && d < to;
@@ -649,7 +660,15 @@
       .map(([id, qty]) => {
         const p = findProduct(id);
         if (!p) return null;
-        return { productId: p.id, name: p.name, sku: p.sku || '', price: p.price, qty, subtotal: p.price * qty };
+        return {
+          productId: p.id,
+          name: p.name,
+          sku: p.sku || '',
+          price: p.price,
+          costPrice: Number.isSafeInteger(p.costPrice) && p.costPrice >= 0 ? p.costPrice : null,
+          qty,
+          subtotal: p.price * qty,
+        };
       })
       .filter(Boolean);
 
@@ -701,7 +720,8 @@
       no,
       date: new Date().toISOString(),
       customer: $('customer').value.trim() || 'Pelanggan umum',
-      items: c.items.map(({ productId, name, sku, price, qty, subtotal }) => ({ productId, name, sku, price, qty, subtotal })),
+      items: c.items.map(({ productId, name, sku, price, costPrice, qty, subtotal }) =>
+        ({ productId, name, sku, price, costPrice, qty, subtotal })),
       subtotal: c.subtotal,
       discountType: c.discountType,
       discountValue: c.discountValue,
@@ -996,6 +1016,7 @@
               <div class="actions">
                 <button type="button" class="small" data-edit="${esc(p.id)}">Ubah</button>
                 ${svc ? '' : `<button type="button" class="small" data-restock="${esc(p.id)}">+ Stok</button>
+                <button type="button" class="small ghost" data-stocktake="${esc(p.id)}">Opname</button>
                 <button type="button" class="small ghost" data-moves="${esc(p.id)}">Riwayat</button>`}
                 <button type="button" class="small ghost" data-toggle="${esc(p.id)}">${active ? 'Nonaktifkan' : 'Aktifkan'}</button>
               </div>
@@ -1033,6 +1054,7 @@
     $('pType').value = p ? (isService(p) ? 'jasa' : 'barang') : 'barang';
     $('pType').disabled = Boolean(p);
     $('pPrice').value = p ? p.price : '';
+    $('pCost').value = p && Number.isSafeInteger(p.costPrice) ? p.costPrice : '';
     $('pStock').value = '';
     $('pMin').value = p && !isService(p) ? minStockOf(p) : DEFAULT_MIN_STOCK;
     syncTypeFields();
@@ -1046,11 +1068,15 @@
     const category = $('pCategory').value || 'Umum';
     const svc = $('pType').value === 'jasa';
     const priceRaw = $('pPrice').value.trim();
+    const costRaw = $('pCost').value.trim();
     const stockRaw = $('pStock').value.trim();
     const minRaw = $('pMin').value.trim();
 
     if (!name) return toast('Nama produk wajib diisi');
     if (priceRaw === '' || !(Number(priceRaw) > 0)) return toast('Harga harus lebih dari 0');
+    if (costRaw !== '' && (!Number.isSafeInteger(Number(costRaw)) || Number(costRaw) < 0)) {
+      return toast('Harga modal harus bilangan bulat nol atau lebih');
+    }
     if (!editingId && !svc && (stockRaw === '' || !Number.isInteger(Number(stockRaw)) || Number(stockRaw) < 0)) {
       return toast('Stok awal harus bilangan bulat ≥ 0');
     }
@@ -1066,6 +1092,7 @@
         sku,
         category,
         price: Math.round(Number(priceRaw)),
+        costPrice: costRaw === '' ? null : Number(costRaw),
         minStock: isService(old) ? 0 : wholeNumber(minRaw || DEFAULT_MIN_STOCK),
       };
       const ok = await safeWrite(['products'], (idb) => idb.objectStore('products').put(updated), 'Produk diperbarui');
@@ -1079,6 +1106,7 @@
         category,
         type: svc ? 'jasa' : 'barang',
         price: Math.round(Number(priceRaw)),
+        costPrice: costRaw === '' ? null : Number(costRaw),
         stock: svc ? null : Number(stockRaw),
         minStock: svc ? 0 : wholeNumber(minRaw || DEFAULT_MIN_STOCK),
         active: true,
@@ -1138,6 +1166,54 @@
     state.movements.push(m);
     closeModal('restockModal');
     renderAll();
+  }
+
+  function openStocktake(id) {
+    const product = findProduct(id);
+    if (!product || isService(product)) return;
+    stocktakeId = id;
+    $('stocktakeTitle').textContent = `Stok opname: ${product.name}`;
+    $('stocktakeInfo').textContent = `Stok di aplikasi saat ini: ${product.stock} unit`;
+    $('stocktakePhysical').value = '';
+    $('stocktakeReason').value = '';
+    openModal('stocktakeModal');
+  }
+
+  async function saveStocktake() {
+    if (busy) return;
+    const product = findProduct(stocktakeId);
+    const rawCount = $('stocktakePhysical').value.trim();
+    const physicalCount = Number(rawCount);
+    const reason = $('stocktakeReason').value.trim();
+    if (!product || isService(product)) return toast('Produk tidak ditemukan atau bukan barang stok');
+    if (rawCount === '' || !Number.isSafeInteger(physicalCount) || physicalCount < 0) {
+      return toast('Masukkan jumlah stok fisik berupa bilangan bulat nol atau lebih');
+    }
+    if (reason.length < 5) return toast('Alasan wajib diisi minimal 5 karakter');
+
+    const difference = physicalCount - product.stock;
+    const updated = { ...product, stock: physicalCount };
+    const record = movement({
+      productId: product.id,
+      type: 'opname',
+      qty: difference,
+      before: product.stock,
+      after: physicalCount,
+      note: `Stok fisik ${physicalCount}. Alasan: ${reason}`,
+    });
+    const ok = await safeWrite(['products', 'movements'], (idb) => {
+      idb.objectStore('products').put(updated);
+      idb.objectStore('movements').put(record);
+    });
+    if (!ok) return;
+
+    state.products = state.products.map((item) => item.id === updated.id ? updated : item);
+    state.movements.push(record);
+    closeModal('stocktakeModal');
+    renderAll();
+    toast(difference === 0
+      ? `Stok ${product.name} sudah sesuai (${physicalCount} unit)`
+      : `Stok ${product.name} disesuaikan ${difference > 0 ? '+' : ''}${difference} unit`);
   }
 
   async function toggleActive(id) {
@@ -1335,6 +1411,19 @@
     $('repWeekN').textContent = `${w.length} transaksi`;
     $('repMonth').textContent = rupiah(sumOf(m));
     $('repMonthN').textContent = `${m.length} transaksi`;
+
+    const renderProfitCard = (transactions, valueId, countId) => {
+      const calculated = transactions.filter((tx) => grossProfitOf(tx) !== null);
+      const unknown = transactions.length - calculated.length;
+      const totalProfit = calculated.reduce((sum, tx) => sum + grossProfitOf(tx), 0);
+      $(valueId).textContent = rupiah(totalProfit);
+      $(countId).textContent = unknown
+        ? `${calculated.length} dihitung · ${unknown} belum ada modal`
+        : `${calculated.length} transaksi dihitung`;
+    };
+    renderProfitCard(d, 'profitDay', 'profitDayN');
+    renderProfitCard(w, 'profitWeek', 'profitWeekN');
+    renderProfitCard(m, 'profitMonth', 'profitMonthN');
 
     progressRow(sumOf(w), state.settings.targetWeek, $('progWeekTxt'), $('progWeek'));
     progressRow(sumOf(m), state.settings.targetMonth, $('progMonthTxt'), $('progMonth'));
@@ -1862,6 +1951,189 @@
     download(`cadangan-sorentho-${dateStamp()}.json`, JSON.stringify(payload, null, 2), 'application/json');
   }
 
+  function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function isWholeNumber(value, minimum = 0) {
+    return Number.isSafeInteger(value) && value >= minimum;
+  }
+
+  function validateBackup(data) {
+    if (!isRecord(data) || data.app !== 'sorentho-kasir') {
+      throw new Error('File ini bukan backup Sorentho Garage Kasir.');
+    }
+    if (!isRecord(data.settings) || !Array.isArray(data.products)
+      || !Array.isArray(data.transactions) || !Array.isArray(data.movements)) {
+      throw new Error('Isi backup tidak lengkap atau formatnya tidak dikenal.');
+    }
+
+    const settings = { ...defaultSettings(), ...data.settings };
+    if (!Array.isArray(settings.categories)
+      || settings.categories.some((category) => typeof category !== 'string')) {
+      throw new Error('Daftar kategori di backup tidak valid.');
+    }
+    if (typeof settings.name !== 'string' || typeof settings.info !== 'string'
+      || !['58', '80'].includes(String(settings.paper))) {
+      throw new Error('Pengaturan toko di backup tidak valid.');
+    }
+    if (!isWholeNumber(settings.lastNo) || !isWholeNumber(settings.targetWeek)
+      || !isWholeNumber(settings.targetMonth)) {
+      throw new Error('Nomor transaksi atau target di backup tidak valid.');
+    }
+
+    const products = data.products.map((product) => {
+      if (!isRecord(product) || typeof product.id !== 'string' || !product.id
+        || typeof product.name !== 'string' || !product.name
+        || !['barang', 'jasa'].includes(product.type)
+        || !isWholeNumber(product.price, 1)
+        || (product.category !== undefined && typeof product.category !== 'string')
+        || (product.sku !== undefined && typeof product.sku !== 'string')
+        || (product.active !== undefined && typeof product.active !== 'boolean')
+        || (product.minStock !== undefined && !isWholeNumber(product.minStock))
+        || (product.type === 'barang' && !isWholeNumber(product.stock))
+        || (product.type === 'jasa' && product.stock !== null)
+        || (product.costPrice !== undefined && product.costPrice !== null
+          && !isWholeNumber(product.costPrice))) {
+        throw new Error('Ada data produk yang tidak valid di backup.');
+      }
+      return { ...product, costPrice: product.costPrice ?? null };
+    });
+    if (new Set(products.map((product) => product.id)).size !== products.length) {
+      throw new Error('Backup berisi ID produk ganda.');
+    }
+
+    const transactions = data.transactions.map((transaction) => {
+      if (!isRecord(transaction) || typeof transaction.id !== 'string' || !transaction.id
+        || typeof transaction.date !== 'string' || !Number.isFinite(Date.parse(transaction.date))
+        || !isWholeNumber(transaction.no, 1) || !isWholeNumber(transaction.total)
+        || !Array.isArray(transaction.items) || !transaction.items.length
+        || (transaction.status !== undefined
+          && !['selesai', 'dibatalkan'].includes(transaction.status))) {
+        throw new Error('Ada data transaksi yang tidak valid di backup.');
+      }
+      const items = transaction.items.map((item) => {
+        if (!isRecord(item) || typeof item.name !== 'string'
+          || typeof item.productId !== 'string' || !item.productId
+          || !isWholeNumber(item.qty, 1) || !isWholeNumber(item.price)
+          || !isWholeNumber(item.subtotal)
+          || (item.costPrice !== undefined && item.costPrice !== null
+            && !isWholeNumber(item.costPrice))) {
+          throw new Error('Ada item transaksi yang tidak valid di backup.');
+        }
+        return { ...item, costPrice: item.costPrice ?? null };
+      });
+      return { ...transaction, status: transaction.status || 'selesai', items };
+    });
+    if (new Set(transactions.map((transaction) => transaction.id)).size !== transactions.length) {
+      throw new Error('Backup berisi ID transaksi ganda.');
+    }
+    if (new Set(transactions.map((transaction) => transaction.no)).size !== transactions.length) {
+      throw new Error('Backup berisi nomor transaksi ganda.');
+    }
+
+    const movements = data.movements.map((record) => {
+      if (!isRecord(record) || typeof record.id !== 'string' || !record.id
+        || typeof record.productId !== 'string' || !record.productId
+        || typeof record.type !== 'string'
+        || !Number.isSafeInteger(record.qty)
+        || !isWholeNumber(record.before) || !isWholeNumber(record.after)
+        || typeof record.at !== 'string' || !Number.isFinite(Date.parse(record.at))) {
+        throw new Error('Ada data riwayat stok yang tidak valid di backup.');
+      }
+      return record;
+    });
+    if (new Set(movements.map((record) => record.id)).size !== movements.length) {
+      throw new Error('Backup berisi ID riwayat stok ganda.');
+    }
+
+    if ((settings.qris !== null && typeof settings.qris !== 'string')
+      || (settings.logo !== null && typeof settings.logo !== 'string')) {
+      throw new Error('Data logo atau QRIS di backup tidak valid.');
+    }
+
+    const highestNumber = transactions.reduce((highest, transaction) => Math.max(highest, transaction.no), 0);
+    settings.lastNo = Math.max(settings.lastNo, highestNumber);
+    const snapshot = { settings, products, transactions, movements };
+    const unknownCostTransactions = transactions.filter((transaction) =>
+      transaction.status !== 'dibatalkan' && grossProfitOf(transaction) === null).length;
+    return { snapshot, unknownCostTransactions };
+  }
+
+  async function prepareBackupRestore(file) {
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      toast('Ukuran backup terlalu besar (maksimal 25 MB).');
+      return;
+    }
+    try {
+      const data = JSON.parse(await file.text());
+      const validated = validateBackup(data);
+      pendingRestore = {
+        ...validated,
+        exportedAt: typeof data.exportedAt === 'string' && Number.isFinite(Date.parse(data.exportedAt))
+          ? fmtDateTime(data.exportedAt)
+          : 'Tidak tercantum',
+        fileName: file.name,
+      };
+      $('restoreConfirmation').value = '';
+      $('restorePreviewText').textContent = [
+        `File: ${pendingRestore.fileName}`,
+        `Backup dibuat: ${pendingRestore.exportedAt}`,
+        `Produk: ${pendingRestore.snapshot.products.length}`,
+        `Transaksi: ${pendingRestore.snapshot.transactions.length}`,
+        `Riwayat stok: ${pendingRestore.snapshot.movements.length}`,
+        `Transaksi lama tanpa data modal: ${pendingRestore.unknownCostTransactions}`,
+      ].join('\n');
+      openModal('restorePreviewModal');
+    } catch (err) {
+      console.error('Validasi file backup gagal', err);
+      toast(`Backup tidak dapat dipulihkan: ${err.message}`);
+    }
+  }
+
+  async function confirmBackupRestore() {
+    if (busy) return;
+    if (syncingCloud) return toast('Sinkronisasi sedang berlangsung. Coba lagi sebentar.');
+    if (!pendingRestore) return toast('Pilih file backup terlebih dahulu');
+    if ($('restoreConfirmation').value.trim() !== 'PULIHKAN') {
+      return toast('Ketik PULIHKAN dengan benar untuk melanjutkan');
+    }
+
+    const { snapshot } = pendingRestore;
+    const saved = await safeWrite(
+      ['products', 'transactions', 'settings', 'movements'],
+      (idb) => {
+        const products = idb.objectStore('products');
+        const transactions = idb.objectStore('transactions');
+        const settings = idb.objectStore('settings');
+        const movements = idb.objectStore('movements');
+        products.clear();
+        transactions.clear();
+        settings.clear();
+        movements.clear();
+        snapshot.products.forEach((product) => products.put(product));
+        snapshot.transactions.forEach((transaction) => transactions.put(transaction));
+        settings.put({ key: 'main', value: snapshot.settings });
+        snapshot.movements.forEach((record) => movements.put(record));
+      },
+      'Backup berhasil dipulihkan ke cloud.',
+    );
+    if (!saved) return;
+
+    state = {
+      products: snapshot.products,
+      transactions: [...snapshot.transactions].sort((a, b) => b.no - a.no),
+      movements: snapshot.movements,
+      settings: snapshot.settings,
+    };
+    pendingRestore = null;
+    closeModal('restorePreviewModal');
+    renderAll();
+    fillSettingsForm();
+    applyLogo();
+  }
+
   /* ------------------------------------------------------------------------
      Pemasangan PWA
      ------------------------------------------------------------------------ */
@@ -1919,9 +2191,10 @@
     $(id).classList.remove('open');
   }
 
-  const MODAL_IDS = ['productModal', 'restockModal', 'categoryModal', 'movementsModal', 'receiptModal', 'voidModal', 'qrisModal', 'resetSalesModal'];
+  const MODAL_IDS = ['productModal', 'restockModal', 'stocktakeModal', 'categoryModal', 'movementsModal', 'receiptModal', 'voidModal', 'qrisModal', 'resetSalesModal', 'restorePreviewModal'];
   function closeAllModals() {
     MODAL_IDS.forEach(closeModal);
+    pendingRestore = null;
     settleConfirm(false);
   }
 
@@ -2048,6 +2321,7 @@
       if (!b) return;
       if (b.dataset.edit) openProductModal(b.dataset.edit);
       else if (b.dataset.restock) openRestock(b.dataset.restock);
+      else if (b.dataset.stocktake) openStocktake(b.dataset.stocktake);
       else if (b.dataset.moves) openMoves(b.dataset.moves);
       else if (b.dataset.toggle) toggleActive(b.dataset.toggle);
     });
@@ -2058,6 +2332,8 @@
     on('rCancel', 'click', () => closeModal('restockModal'));
     on('rSave', 'click', saveRestock);
     on('movClose', 'click', () => closeModal('movementsModal'));
+    on('stocktakeCancel', 'click', () => closeModal('stocktakeModal'));
+    on('stocktakeSave', 'click', saveStocktake);
 
     // Jenis produk
     on('addCatBtn', 'click', () => openCategoryModal());
@@ -2116,6 +2392,16 @@
     // Pengaturan
     on('saveSettingsBtn', 'click', saveSettings);
     on('backupBtn', 'click', exportBackup);
+    on('restoreFile', 'change', (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      prepareBackupRestore(file);
+    });
+    on('restoreCancel', 'click', () => {
+      pendingRestore = null;
+      closeModal('restorePreviewModal');
+    });
+    on('restoreConfirm', 'click', confirmBackupRestore);
     on('resetSalesBtn', 'click', openResetSalesHistory);
     on('resetSalesCancel', 'click', () => closeModal('resetSalesModal'));
     on('resetSalesConfirm', 'click', confirmResetSalesHistory);

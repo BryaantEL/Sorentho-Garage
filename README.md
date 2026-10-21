@@ -1,4 +1,4 @@
-# Sorentho Garage Kasir — v2.2.2
+# Sorentho Garage Kasir — v2.3.0
 
 Aplikasi kasir berbasis web (PWA). Data toko disimpan di Supabase dan dibagikan antar perangkat yang masuk ke akun pemilik yang sama. IndexedDB di browser hanya menjadi cache; transaksi dan perubahan data memerlukan koneksi internet.
 
@@ -46,12 +46,21 @@ Buka aplikasi di Chrome Android, tekan **⋮**, lalu pilih **Instal aplikasi** a
 | Menu | Fungsi |
 |---|---|
 | **Kasir** | Pilih produk, keranjang, diskon, pembayaran tunai / QRIS / transfer, nominal cepat, kembalian |
-| **Produk** | Jenis produk (buat, ubah, hapus), tambah dan ubah produk, tambah stok, riwayat stok, nonaktifkan produk |
-| **Laporan** | Omzet hari, minggu, dan bulan; grafik 7 hari, 8 minggu, atau 12 bulan; produk terlaris; metode bayar; target dan saran |
+| **Produk** | Jenis produk (buat, ubah, hapus), harga modal, tambah stok, stok opname, riwayat stok, nonaktifkan produk |
+| **Laporan** | Omzet dan laba kotor hari, minggu, dan bulan; grafik 7 hari, 8 minggu, atau 12 bulan; produk terlaris; metode bayar; target dan saran |
 | **Riwayat** | Daftar transaksi, struk, simpan struk sebagai gambar, bagikan, cetak, batalkan transaksi, export CSV |
-| **Pengaturan** | Akun, QRIS toko, logo toko, nama dan alamat toko, lebar kertas struk, cadangan JSON, reset riwayat transaksi dan pergerakan stok |
+| **Pengaturan** | Akun, QRIS toko, logo toko, nama dan alamat toko, lebar kertas struk, unduh dan pulihkan backup JSON, reset riwayat transaksi dan pergerakan stok |
 
 Reset riwayat di **Pengaturan** menghapus transaksi beserta riwayat pergerakan stok dari cloud, mengatur ulang nomor transaksi, dan tidak mengubah stok produk. Unduh cadangan terlebih dahulu jika masih memerlukan salinan data lama.
+
+### Pulihkan backup
+Di **Pengaturan → Cadangan data**, pilih file backup JSON. Periksa pratinjau, lalu ketik `PULIHKAN` untuk mengganti semua data cloud dan perangkat dengan isi backup. Tindakan ini mengganti produk, stok, pengaturan, transaksi, dan riwayat stok; buat backup terbaru sebelum melanjutkan.
+
+### Laba kotor
+Isi **Harga modal per unit** saat membuat atau mengubah produk. Untuk jasa, isi biaya langsung per layanan jika ingin menghitung labanya. Laporan laba kotor memakai harga jual transaksi setelah diskon dikurangi harga modal yang disimpan saat transaksi dibuat. Transaksi lama atau barang tanpa harga modal ditandai belum dapat dihitung; harga modal yang baru diisi tidak mengubah catatan transaksi lama.
+
+### Stok opname
+Di **Produk**, tekan **Opname** pada barang, masukkan jumlah fisik yang dihitung, lalu isi alasan/catatan. Aplikasi membandingkan hasil hitung dengan stok saat ini dan menyimpan penyesuaian beserta riwayatnya ke cloud. Opname tidak mengubah transaksi penjualan.
 
 ### QRIS
 1. Di **Pengaturan → QRIS toko**, unggah gambar QRIS Anda sekali saja.
@@ -78,7 +87,6 @@ Menu **Laporan** memberi saran target minggu dan bulan dari rata-rata penjualan 
 
 ## 7. Yang belum ada
 
-- Impor cadangan JSON (cadangan bisa diunduh, belum bisa dipulihkan)
 - Cetak langsung ke printer Bluetooth thermal (saat ini lewat dialog cetak Android)
 - Pembayaran QRIS otomatis (saat ini konfirmasi manual)
 - Banyak akun dan peran kasir/pemilik

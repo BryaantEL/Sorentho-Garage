@@ -183,7 +183,7 @@
           <div class="phead">
             <div>
               <h2>Produk &amp; stok</h2>
-              <p class="muted small-text">Ubah data produk, tambah stok, lihat riwayat stok, atau nonaktifkan produk.</p>
+              <p class="muted small-text">Ubah produk, tambah stok, lakukan opname stok fisik, lihat riwayat stok, atau nonaktifkan produk.</p>
             </div>
             <div class="tools">
               <input type="search" id="manageSearch" placeholder="Cari produk…" aria-label="Cari produk" autocomplete="off">
@@ -213,6 +213,30 @@
             <div class="hint" id="repMonthN">0 transaksi</div>
           </div>
         </div>
+
+        <section class="panel stack" style="margin-top:14px">
+          <div>
+            <h2>Laba kotor</h2>
+            <p class="muted small-text">Omzet setelah diskon dikurangi harga modal barang/jasa. Transaksi lama atau produk tanpa harga modal belum ikut dihitung.</p>
+          </div>
+          <div class="cards3 profit-cards">
+            <div class="stat">
+              <div class="cap">Hari ini</div>
+              <div class="num" id="profitDay">Rp0</div>
+              <div class="hint" id="profitDayN">0 transaksi dihitung</div>
+            </div>
+            <div class="stat">
+              <div class="cap">Minggu ini</div>
+              <div class="num" id="profitWeek">Rp0</div>
+              <div class="hint" id="profitWeekN">0 transaksi dihitung</div>
+            </div>
+            <div class="stat">
+              <div class="cap">Bulan ini</div>
+              <div class="num" id="profitMonth">Rp0</div>
+              <div class="hint" id="profitMonthN">0 transaksi dihitung</div>
+            </div>
+          </div>
+        </section>
 
         <section class="panel stack">
           <div>
@@ -362,6 +386,11 @@
             <p class="muted small-text">Data utama tersimpan di cloud. Unduh cadangan berkala sebagai salinan tambahan.</p>
           </div>
           <button type="button" id="backupBtn">⇩ Unduh cadangan (JSON)</button>
+          <div class="tools">
+            <label class="filebtn" for="restoreFile">Pilih backup JSON</label>
+            <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+          </div>
+          <p class="note">Pemulihan akan mengganti seluruh data cloud dan data semua perangkat setelah Anda memeriksa pratinjau dan mengonfirmasi.</p>
         </section>
 
         <section class="panel stack danger-zone" style="margin-top:14px">
@@ -373,7 +402,7 @@
           <button type="button" class="danger" id="resetSalesBtn">Reset transaksi &amp; riwayat</button>
         </section>
 
-        <p class="footer">Sorentho Garage Kasir v<span id="appVersion">2.2.2</span></p>
+        <p class="footer">Sorentho Garage Kasir v<span id="appVersion">2.3.0</span></p>
       </section>
 
     </main>
@@ -445,6 +474,11 @@
             <label for="pPrice">Harga (Rp)</label>
             <input type="number" inputmode="numeric" min="0" id="pPrice" placeholder="150000">
           </div>
+          <div>
+            <label for="pCost">Harga modal per unit (Rp)</label>
+            <input type="number" inputmode="numeric" min="0" step="1" id="pCost" placeholder="Kosongkan jika belum tahu">
+          </div>
+          <p class="note full">Harga modal disimpan pada transaksi saat penjualan. Untuk jasa, masukkan biaya langsung per layanan jika ingin menghitung laba.</p>
           <div id="stockField">
             <label for="pStock">Stok awal</label>
             <input type="number" inputmode="numeric" min="0" id="pStock" placeholder="10">
@@ -474,6 +508,25 @@
         <div class="modalactions">
           <button type="button" id="rCancel">Batal</button>
           <button type="button" class="primary" id="rSave">Tambah stok</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modalback" id="stocktakeModal" role="dialog" aria-modal="true" aria-labelledby="stocktakeTitle">
+      <div class="modal">
+        <h3 id="stocktakeTitle">Stok opname</h3>
+        <p id="stocktakeInfo"></p>
+        <div class="field">
+          <label for="stocktakePhysical">Jumlah stok yang benar-benar dihitung</label>
+          <input type="number" inputmode="numeric" min="0" step="1" id="stocktakePhysical" placeholder="Contoh: 8">
+        </div>
+        <div class="field">
+          <label for="stocktakeReason">Alasan / catatan (wajib)</label>
+          <textarea id="stocktakeReason" rows="3" maxlength="250" placeholder="Contoh: hasil hitung stok rak hari ini"></textarea>
+        </div>
+        <div class="modalactions">
+          <button type="button" id="stocktakeCancel">Batal</button>
+          <button type="button" class="primary" id="stocktakeSave">Simpan hasil opname</button>
         </div>
       </div>
     </div>
@@ -569,6 +622,20 @@
         <div class="modalactions">
           <button type="button" id="resetSalesCancel">Batal</button>
           <button type="button" class="danger" id="resetSalesConfirm">Hapus permanen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modalback" id="restorePreviewModal" role="alertdialog" aria-modal="true" aria-labelledby="restorePreviewTitle">
+      <div class="modal">
+        <h3 id="restorePreviewTitle">Pratinjau pemulihan backup</h3>
+        <p id="restorePreviewText"></p>
+        <p class="danger-text">Semua data cloud saat ini pada semua perangkat akan diganti oleh isi file ini.</p>
+        <label for="restoreConfirmation">Ketik PULIHKAN untuk melanjutkan</label>
+        <input id="restoreConfirmation" autocomplete="off" spellcheck="false">
+        <div class="modalactions">
+          <button type="button" id="restoreCancel">Batal</button>
+          <button type="button" class="danger" id="restoreConfirm">Ganti data cloud</button>
         </div>
       </div>
     </div>

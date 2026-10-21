@@ -74,6 +74,9 @@ $$;
 revoke all on function public.save_shop_state(jsonb, bigint) from public, anon;
 grant execute on function public.save_shop_state(jsonb, bigint) to authenticated;
 
+insert into public.shop_state (singleton, owner_id, payload)
+values (true, '776c5166-5e1b-49e2-b2c5-c7c1efea576a', null);
+
 -- Replace the UUID with the owner ID shown in Authentication > Users.
 -- The initial null payload tells the app to migrate local data on the first device.
 -- insert into public.shop_state (singleton, owner_id, payload)
